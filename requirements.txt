@@ -1,0 +1,19 @@
+# Requirements for porter_nn_regression_pytorch.ipynb
+# Install with:  pip install -r requirements.txt
+#
+# Lower bounds are the oldest versions the notebook's code needs
+# (e.g. scikit-learn >= 1.2 for OneHotEncoder(sparse_output=...)).
+# The notebook was executed with: pandas 3.0.6, numpy 2.5.4, scikit-learn 1.9.1,
+# matplotlib 3.11.2, seaborn 0.13.2, torch 2.15.0 (CPU), Python 3.12.
+
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.2
+matplotlib>=3.7
+seaborn>=0.12
+torch>=2.0
+gdown>=5.0          # downloads the dataset from the Google Drive link
+
+# To run the notebook locally (Google Colab already includes these):
+jupyter
+ipykernel
