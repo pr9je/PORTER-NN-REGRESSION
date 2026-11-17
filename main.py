@@ -123,3 +123,35 @@ df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
 
 print("Order dates: ", df["created_at"].min(), "->", df["created_at"].max())
 display(df[["created_at", "hour", "day_of_week", "day_of_month", "month", "is_weekend", "hour_sin", "hour_cos"]].head())
+
+validity_rules = {
+    "total_items":              lambda s: s <= 0,
+    "num_distinct_items":       lambda s: s <= 0,
+    "subtotal":                 lambda s: s <= 0,
+    "min_item_price":           lambda s: s <= 0,
+    "max_item_price":           lambda s: s <= 0,
+    "total_onshift_partners":   lambda s: s < 0,
+    "total_busy_partners":      lambda s: s < 0,
+    "total_outstanding_orders": lambda s: s < 0,
+    "estimated_store_to_consumer_driving_duration": lambda s: s <= 0,
+}
+
+report = []
+for col, rule in validity_rules.items():
+    if col in df.columns:
+        bad = rule(df[col])
+        report.append({"column": col, "invalid_values": int(bad.sum()), "pct": round(bad.mean() * 100, 3)})
+        df.loc[bad, col] = np.nan
+display(pd.DataFrame(report))
+
+# Logical inconsistency: cheapest item priced higher than the costliest item
+inconsistent = (df["min_item_price"] > df["max_item_price"]).sum()
+print(f"\nRows where min_item_price > max_item_price: {inconsistent:,} "
+      "(reported, left unchanged: the gaps are small and tree/neural models are robust to this)")
+
+# Code columns -> integer labels (only if no missing values)
+for col in ["market_id", "order_protocol"]:
+    if col in df.columns and df[col].notna().all():
+        df[col] = df[col].astype(int)
+print("\nMissing values after validity cleaning:")
+display(df.isnull().sum()[lambda s: s > 0].to_frame("missing_count"))
