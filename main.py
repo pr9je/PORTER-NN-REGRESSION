@@ -112,3 +112,14 @@ print(f"Duration < {MIN_MINUTES} min: {too_fast} | > {MAX_MINUTES} min: {too_slo
 df = df[df["delivery_time_min"].between(MIN_MINUTES, MAX_MINUTES)].reset_index(drop=True)
 print(f"Rows kept: {len(df):,}\n")
 display(df["delivery_time_min"].describe(percentiles=[.01, .05, .25, .5, .75, .95, .99]).round(2).to_frame().T)
+
+df["hour"] = df["created_at"].dt.hour
+df["day_of_week"] = df["created_at"].dt.day_name()
+df["day_of_month"] = df["created_at"].dt.day
+df["month"] = df["created_at"].dt.month
+df["is_weekend"] = df["created_at"].dt.dayofweek.isin([5,6]).astype(int)
+df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
+df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
+
+print("Order dates: ", df["created_at"].min(), "->", df["created_at"].max())
+display(df[["created_at", "hour", "day_of_week", "day_of_month", "month", "is_weekend", "hour_sin", "hour_cos"]].head())
