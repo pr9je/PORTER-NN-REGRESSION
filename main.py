@@ -79,3 +79,7 @@ missing = pd.DataFrame({
 
 display(missing.sort_values("missing_pct", ascending=False))
 print("Total missing cells: ", int(missing["missing_count"].sum()))
+
+rows_before = len(df)
+df = df.drop_duplicates().reset_index(drop=True)
+print(f"Rows before: {rows_before:,} | after dropping duplicates: {len(df):,} | removed: {rows_before - len(df):,}")
