@@ -83,3 +83,19 @@ print("Total missing cells: ", int(missing["missing_count"].sum()))
 rows_before = len(df)
 df = df.drop_duplicates().reset_index(drop=True)
 print(f"Rows before: {rows_before:,} | after dropping duplicates: {len(df):,} | removed: {rows_before - len(df):,}")
+
+# Convert text -> datetime64
+for col in TIMESTAMP_COLS:
+    df[col] = pd.to_datetime(df[col], errors="coerce")
+print("Unparsable timestamps (NaT):", int(df[TIMESTAMP_COLS].isnull().sum().sum()))
+df = df.dropna(subset=TIMESTAMP_COLS).reset_index(drop=True)
+
+# Demonstration on the first order
+start, end = df.loc[0, "created_at"], df.loc[0, "actual_delivery_time"]
+print("\nTimestamp :", start, "->", type(start).__name__)
+print("Timedelta :", end - start, "->", type(end - start).__name__)
+print("Period    :", start.to_period("M"), "->", type(start.to_period("M")).__name__)
+
+print("\nOrders per week, using Period('W') for grouping:")
+display(df.groupby(df["created_at"].dt.to_period("W")).size().rename("orders"))
+print(df[TIMESTAMP_COLS].dtypes)
