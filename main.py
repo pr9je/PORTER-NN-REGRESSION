@@ -34,3 +34,34 @@ sns.set_theme(style="whitegrid", context="notebook")
 plt.rcParams["figure.dpi"] = 100
 pd.set_option("display.max_columns", 50)
 print("pandas",pd.__version__, "| Pytorch", torch.__version__, "| device:",DEVICE)
+
+# Load the dataset
+
+raw_df = pd.read_csv("/content/data_2.csv")
+
+# Make the column names match the project brief ("partners" instead of dashers)
+RENAME_MAP ={"total_onshit_dasher": "total_onshit_partners",
+             "total_busy_dasher": "total_busy_partners"}
+
+raw_df = raw_df.rename(columns=RENAME_MAP)
+
+df = raw_df.copy()
+
+print("First five records")
+display(df.head())
+print("="*50)
+print("Last five records")
+display(df.tail())
+
+print(f"\nShape: {df.shape[0]:,} rows x {df.shape[1]} columns\n")
+print("="*50)
+df.info()
+print("="*50)
+print("\nDuplicate rows:", df.duplicated().sum())
+
+print("Descriptive statistics - numerical columns")
+display(df.describe().T)
+
+print("="*100)
+print("Descriptive statistics - timestamp columns (currently stored as object)")
+display(df[["created_at", "actual_delivery_time"]].describe())
