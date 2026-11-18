@@ -65,3 +65,15 @@ display(df.describe().T)
 print("="*100)
 print("Descriptive statistics - timestamp columns (currently stored as object)")
 display(df[["created_at", "actual_delivery_time"]].describe())
+
+TIMESTAMP_COLS = ["created_at", "actual_delivery_time"]
+CODE_COLS = [c for c in ["market_id", "order_protocol", "store_primary_category", "store_id"] if c in df.columns]
+NUMERIC_COLS = [ c for c in df.columns if c not in TIMESTAMP_COLS + CODE_COLS]
+
+print("Timestamp columns (stored as object):", TIMESTAMP_COLS)
+print("\nCategorical columns (numeric codes) and number of distinct values:")
+for c in CODE_COLS:
+  print(f" {c:25s} {df[c].nunique():>4} distinct values")
+print("\nNumerical Columns:")
+for c in NUMERIC_COLS:
+  print(" ",c)
