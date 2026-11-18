@@ -1,4 +1,4 @@
-import os, time, warnings
+import time, warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -20,138 +20,17 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-SEED = 42 # one seed used everywhere
+warnings.filterwarnings("ignore")
+
+SEED = 42
 def set_all_seeds(seed=SEED):
-  """Seed python, numpy and Pytorch so taht run are repeatable"""
+  """Seed python, numpy and PyTorch so that runs are repeatable"""
   random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
 set_all_seeds(SEED)
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
 sns.set_theme(style="whitegrid", context="notebook")
 plt.rcParams["figure.dpi"] = 100
 pd.set_option("display.max_columns", 50)
-print("pandas", pd.__version__, "|Pytorch", torch.__version__, "| device:", DEVICE)
-
-# loading dataset
-
-raw_df = pd.read_csv("/content/data_2.csv")
-
-# Make the column names match the projecr brief ("partners" instead of "dashers")
-RENAME_MAP = {"total_onshift_dashers": "total_onshift_partners",
-              "total_busy_dashers": "total_busy_partners"}
-
-raw_df = raw_df.rename(columns=RENAME_MAP)
-
-df = raw_df.copy() # work on a copy so the raw data is always available
-print(f"Loaded {df.head}")
-
-print("First five records")
-display(df.head())
-print("Last five records")
-display(df.tail())
-
-print(f"\nShape: {df.shape[0]:,} rows x {df.shape[1]} columns\n")
-df.info()
-print("\nDuplicate rows: ", df.duplicated().sum())
-
-print("Descriptive statistics - numeric columns")
-display(df.describe().T)
-
-print("Descriptive statistics - timestamp columns (currently stored as text)")
-display(df[["created_at", "actual_delivery_time"]].describe())
-
-TIMESTAMP_COLS = ["created_at", "actual_delivery_time"]
-CODE_COLS = [c for c in ["market_id", "order_protocol", "store_primary_category", "store_id"] if c in df.columns]
-NUMERIC_COLS = [c for c in df.columns if c not in TIMESTAMP_COLS + CODE_COLS]
-
-print("Timestamp columns (stored as text):", TIMESTAMP_COLS)
-print("\nCategorical columns (numeric codes) and number of distinct values:")
-for c in CODE_COLS:
-    print(f"  {c:25s} {df[c].nunique():>4} distinct values")
-print("\nNumerical columns:")
-for c in NUMERIC_COLS:
-    print("  ", c)
-
-missing = pd.DataFrame({
-    "missing_count": df.isnull().sum(),
-    "missing_pct": ((df.isnull().sum() / len(df)) * 100).round(3)
-})
-
-display(missing.sort_values("missing_pct", ascending=False))
-print("Total missing cells: ", int(missing["missing_count"].sum()))
-
-rows_before = len(df)
-df = df.drop_duplicates().reset_index(drop=True)
-print(f"Rows before: {rows_before:,} | after dropping duplicates: {len(df):,} | removed: {rows_before - len(df):,}")
-
-# Convert text -> datetime64
-for col in TIMESTAMP_COLS:
-    df[col] = pd.to_datetime(df[col], errors="coerce")
-print("Unparsable timestamps (NaT):", int(df[TIMESTAMP_COLS].isnull().sum().sum()))
-df = df.dropna(subset=TIMESTAMP_COLS).reset_index(drop=True)
-
-# Demonstration on the first order
-start, end = df.loc[0, "created_at"], df.loc[0, "actual_delivery_time"]
-print("\nTimestamp :", start, "->", type(start).__name__)
-print("Timedelta :", end - start, "->", type(end - start).__name__)
-print("Period    :", start.to_period("M"), "->", type(start.to_period("M")).__name__)
-
-print("\nOrders per week, using Period('W') for grouping:")
-display(df.groupby(df["created_at"].dt.to_period("W")).size().rename("orders"))
-print(df[TIMESTAMP_COLS].dtypes)
-
-
-# Target cretion: delivery time in minutes
-df["delivery_time_min"] = (df["actual_delivery_time"] - df["created_at"]).dt.total_seconds() / 60
-
-MIN_MINUTES, MAX_MINUTES = 5, 240
-too_fast = (df["delivery_time_min"] < MIN_MINUTES).sum()
-too_slow = (df["delivery_time_min"] > MAX_MINUTES).sum()
-print(f"Duration < {MIN_MINUTES} min: {too_fast} | > {MAX_MINUTES} min: {too_slow}")
-
-df = df[df["delivery_time_min"].between(MIN_MINUTES, MAX_MINUTES)].reset_index(drop=True)
-print(f"Rows kept: {len(df):,}\n")
-display(df["delivery_time_min"].describe(percentiles=[.01, .05, .25, .5, .75, .95, .99]).round(2).to_frame().T)
-
-df["hour"] = df["created_at"].dt.hour
-df["day_of_week"] = df["created_at"].dt.day_name()
-df["day_of_month"] = df["created_at"].dt.day
-df["month"] = df["created_at"].dt.month
-df["is_weekend"] = df["created_at"].dt.dayofweek.isin([5,6]).astype(int)
-df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
-df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
-
-print("Order dates: ", df["created_at"].min(), "->", df["created_at"].max())
-display(df[["created_at", "hour", "day_of_week", "day_of_month", "month", "is_weekend", "hour_sin", "hour_cos"]].head())
-
-validity_rules = {
-    "total_items":              lambda s: s <= 0,
-    "num_distinct_items":       lambda s: s <= 0,
-    "subtotal":                 lambda s: s <= 0,
-    "min_item_price":           lambda s: s <= 0,
-    "max_item_price":           lambda s: s <= 0,
-    "total_onshift_partners":   lambda s: s < 0,
-    "total_busy_partners":      lambda s: s < 0,
-    "total_outstanding_orders": lambda s: s < 0,
-    "estimated_store_to_consumer_driving_duration": lambda s: s <= 0,
-}
-
-report = []
-for col, rule in validity_rules.items():
-    if col in df.columns:
-        bad = rule(df[col])
-        report.append({"column": col, "invalid_values": int(bad.sum()), "pct": round(bad.mean() * 100, 3)})
-        df.loc[bad, col] = np.nan
-display(pd.DataFrame(report))
-
-# Logical inconsistency: cheapest item priced higher than the costliest item
-inconsistent = (df["min_item_price"] > df["max_item_price"]).sum()
-print(f"\nRows where min_item_price > max_item_price: {inconsistent:,} "
-      "(reported, left unchanged: the gaps are small and tree/neural models are robust to this)")
-
-# Code columns -> integer labels (only if no missing values)
-for col in ["market_id", "order_protocol"]:
-    if col in df.columns and df[col].notna().all():
-        df[col] = df[col].astype(int)
-print("\nMissing values after validity cleaning:")
-display(df.isnull().sum()[lambda s: s > 0].to_frame("missing_count"))
+print("pandas",pd.__version__, "| Pytorch", torch.__version__, "| device:",DEVICE)
