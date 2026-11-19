@@ -77,3 +77,11 @@ for c in CODE_COLS:
 print("\nNumerical Columns:")
 for c in NUMERIC_COLS:
   print(" ",c)
+
+missing = pd.DataFrame({
+    "missing_count": df.isnull().sum(),
+    "missing_pct": (df.isnull().mean() * 100).round(3),
+})
+print("*"*100)
+display(missing.sort_values("missing_pct",ascending=False))
+print("Total missing cells:", int(missing["missing_count"].sum()))
