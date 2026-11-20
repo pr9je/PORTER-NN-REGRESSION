@@ -101,3 +101,14 @@ print("Period    :", start.to_period("M"), "->", type(start.to_period("M")).__na
 print("\nOrders per week, using Period('W') for grouping:")
 display(df.groupby(df["created_at"].dt.to_period("W")).size().rename("orders"))
 print(df[TIMESTAMP_COLS].dtypes)
+
+df["delivery_time_min"] = (df["actual_delivery_time"] - df["created_at"]).dt.total_seconds() / 60
+
+MIN_MINUTES, MAX_MINUTES = 5, 240
+too_fast = (df["delivery_time_min"] < MIN_MINUTES).sum()
+too_slow = (df["delivery_time_min"] > MAX_MINUTES).sum()
+print(f"Durations < {MIN_MINUTES} min: {too_fast} | > {MAX_MINUTES} min: {too_slow}")
+
+df = df[df["delivery_time_min"].between(MIN_MINUTES, MAX_MINUTES)].reset_index(drop=True)
+print(f"Rows kept: {len(df):,}\n")
+display(df["delivery_time_min"].describe(percentiles=[.01, .05, .25, .5, .75, .95, .99]).round(2).to_frame().T)
