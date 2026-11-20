@@ -85,3 +85,9 @@ missing = pd.DataFrame({
 print("*"*100)
 display(missing.sort_values("missing_pct",ascending=False))
 print("Total missing cells:", int(missing["missing_count"].sum()))
+
+# convert text -> datetime64
+for col in TIMESTAMP_COLS:
+  df[col] = pd.to_datetime(df[col], errors="coerce")
+print("Unparsable timestamp (NaT):", int(df[TIMESTAMP_COLS].isnull().sum().sum()))
+df = df.dropna(subset=TIMESTAMP_COLS).reset_index(drop=True)
