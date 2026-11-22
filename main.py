@@ -169,3 +169,36 @@ b, o = df["total_busy_partners"], df["total_onshift_partners"]
 df["partners_overloaded"] = (b > o).astype(float).where(b.notna() & o.notna())
 df["single_item_order"] = (df["num_distinct_items"] == 1).astype(float).where(df["num_distinct_items"].notna())
 display(df[["is_weekend", "partners_overloaded", "single_item_order"]].mean().mul(100).round(1).to_frame("% of orders with flag = 1"))
+
+# Choosng features and splittingthe data (before any fittingg)
+TARGET = "delivery_time_min"
+
+NUMERIC_FEATURES = [c for c in [
+    "total_items", "subtotal", "num_distinct_items", "min_item_price", "max_item_price",
+    "total_onshift_partners", "total_busy_partners", "total_outstanding_orders",
+    "estimated_store_to_consumer_driving_duration",
+    "available_partners", "busy_ratio", "outstanding_per_partner",
+    "hour", "hour_sin", "hour_cos",
+    "is_weekend", "partners_overloaded", "single_item_order"] if c in df.columns]
+CATEGORICAL_FEATURES = [c for c in ["market_id", "order_protocol", "store_primary_category", "day_of_week"] if c in df.columns]
+FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+
+# ---- Leakage guard: these must never be model inputs ----
+FORBIDDEN = {"actual_delivery_time", "created_at", TARGET}
+assert FORBIDDEN.isdisjoint(FEATURES), "Target leakage: a forbidden column is in the feature list!"
+print("Leakage check passed.")
+print(f"{len(NUMERIC_FEATURES)} numeric + {len(CATEGORICAL_FEATURES)} categorical features")
+
+X = df[FEATURES]
+y = df[TARGET]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=SEED)
+X_train, X_test = X_train.copy(), X_test.copy()
+print(f"Train: {X_train.shape[0]:,} rows | Test: {X_test.shape[0]:,} rows")
+
+# Peak-hour flag: the busiest hours are learned from the TRAINING set only, then applied to both sets
+PEAK_HOURS = sorted(X_train["hour"].value_counts().head(5).index.tolist())
+for frame in (X_train, X_test):
+    frame["is_peak_hour"] = frame["hour"].isin(PEAK_HOURS).astype(int)
+NUMERIC_FEATURES.append("is_peak_hour"); FEATURES.append("is_peak_hour")
+print("Peak hours (5 busiest in training data, hours as stored):", PEAK_HOURS)
+print(f"{len(NUMERIC_FEATURES)} numeric + {len(CATEGORICAL_FEATURES)} categorical features in total")
