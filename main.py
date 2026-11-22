@@ -156,3 +156,10 @@ for col in ["market_id", "order_protocol"]:
     if col in df.columns and df[col].notna().all():
         df[col] = df[col].astype(int)
 print(f"\nMissing cells after validity cleaning (to be imputed in the pipeline): {int(df.isnull().sum().sum()):,}")
+
+# Fleet-load features
+df["onshift"] = df["total_onshift_dashers"].where(df["total_onshift_dashers"] > 0)   # 0 or NaN -> NaN (avoids divide-by-zero)
+df["available_partners"] = df["total_onshift_dashers"] - df["total_busy_dashers"]
+df["busy_ratio"] = (df["total_busy_dashers"] / df["onshift"]).replace([np.inf, -np.inf], np.nan)
+df["outstanding_per_partner"] = (df["total_outstanding_orders"] / df["onshift"]).replace([np.inf, -np.inf], np.nan)
+display(df[["total_onshift_dashers", "total_busy_dashers", "total_outstanding_orders","available_partners", "busy_ratio", "outstanding_per_partner"]].describe().T.round(2))
