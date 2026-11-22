@@ -163,3 +163,9 @@ df["available_partners"] = df["total_onshift_dashers"] - df["total_busy_dashers"
 df["busy_ratio"] = (df["total_busy_dashers"] / df["onshift"]).replace([np.inf, -np.inf], np.nan)
 df["outstanding_per_partner"] = (df["total_outstanding_orders"] / df["onshift"]).replace([np.inf, -np.inf], np.nan)
 display(df[["total_onshift_dashers", "total_busy_dashers", "total_outstanding_orders","available_partners", "busy_ratio", "outstanding_per_partner"]].describe().T.round(2))
+
+# Binary Flags
+b, o = df["total_busy_partners"], df["total_onshift_partners"]
+df["partners_overloaded"] = (b > o).astype(float).where(b.notna() & o.notna())
+df["single_item_order"] = (df["num_distinct_items"] == 1).astype(float).where(df["num_distinct_items"].notna())
+display(df[["is_weekend", "partners_overloaded", "single_item_order"]].mean().mul(100).round(1).to_frame("% of orders with flag = 1"))
