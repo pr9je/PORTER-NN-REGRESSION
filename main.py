@@ -292,3 +292,39 @@ for col in UNI_COLS:
     ratio = f", max = {s.max() / med:.1f}x the median" if med > 0 else ""
     lines.append(f"* **{col}**: skewness {s.skew():.2f}, {describe_skew(s.skew())}; median {med:.1f}, mean {s.mean():.1f}{ratio}.")
 display(Markdown("\n".join(lines)))
+
+# Countplots of categorical features
+fig, axes = plt.subplots(2, 2, figsize=(15, 8))
+
+# Subplot 0, 0: Market ID
+sns.countplot(data=eda, x="market_id", color="steelblue", ax=axes[0, 0])
+axes[0, 0].set(title="Orders per market", xlabel="Market ID", ylabel="Orders")
+axes[0, 0].bar_label(axes[0, 0].containers[0], fmt='%.0f')
+
+# Subplot 0, 1: Order Protocol
+sns.countplot(data=eda, x="order_protocol", color="seagreen", ax=axes[0, 1])
+axes[0, 1].set(title="Orders per order protocol", xlabel="Order protocol (code)", ylabel="Orders")
+axes[0, 1].bar_label(axes[0, 1].containers[0], fmt='%.0f')
+
+# Subplot 1, 0: Day of Week
+day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+sns.countplot(data=eda, x="day_of_week", order=day_order, color="darkorange", ax=axes[1, 0])
+axes[1, 0].set(title="Orders per day of week", xlabel="Day of week", ylabel="Orders")
+axes[1, 0].tick_params(axis="x", rotation=30)
+axes[1, 0].bar_label(axes[1, 0].containers[0], fmt='%.0f')
+
+# Subplot 1, 1: Top 15 Categories
+top_cats = eda["store_primary_category"].value_counts().head(15).index
+sns.countplot(data=eda[eda["store_primary_category"].isin(top_cats)], x="store_primary_category",
+              order=top_cats, color="mediumpurple", ax=axes[1, 1])
+axes[1, 1].set(title="Top 15 restaurant categories by order volume", xlabel="Store category (code)", ylabel="Orders")
+axes[1, 1].tick_params(axis="x", rotation=60)
+axes[1, 1].bar_label(axes[1, 1].containers[0], fmt='%.0f', rotation=90, padding=3)
+
+plt.tight_layout()
+plt.show()
+
+print("Markets: top market holds", f"{eda['market_id'].value_counts(normalize=True).iloc[0]*100:.1f}% of orders")
+print("Order protocols: top protocol holds", f"{eda['order_protocol'].value_counts(normalize=True).iloc[0]*100:.1f}% of orders")
+print(f"Store categories: {eda['store_primary_category'].nunique()} in total; top 15 cover "
+      f"{eda['store_primary_category'].isin(top_cats).mean()*100:.1f}% of orders")
