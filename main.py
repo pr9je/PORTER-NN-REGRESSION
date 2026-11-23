@@ -375,4 +375,30 @@ for ax in axes.ravel()[len(BASE_NUMERIC):]:
     ax.axis("off")
 plt.tight_layout(); plt.show()
 
+# Delivery time by hour of day and by day of week
 
+def mean_ci(frame, by):
+    g = frame.groupby(by)[TARGET].agg(["mean", "std", "count"])
+    g["ci"] = 1.96 * g["std"] / np.sqrt(g["count"])
+    return g
+
+by_hour = mean_ci(eda, "hour")
+by_day = mean_ci(eda, "day_of_week").reindex(day_order)
+
+fig, axes = plt.subplots(1, 2, figsize=(16, 3.8))
+ax2 = axes[0].twinx()
+ax2.bar(by_hour.index, by_hour["count"], color="lightgrey", alpha=0.6)
+ax2.set_ylabel("Number of orders"); ax2.grid(False)
+axes[0].errorbar(by_hour.index, by_hour["mean"], yerr=by_hour["ci"], marker="o", color="steelblue", capsize=3)
+axes[0].set_zorder(ax2.get_zorder() + 1); axes[0].patch.set_visible(False)
+axes[0].set(title="Mean delivery time by hour of day", xlabel="Hour of day (as stored in the data)", ylabel="Mean delivery time (min)")
+
+bars = axes[1].bar(by_day.index, by_day["mean"], yerr=by_day["ci"], color="darkorange", capsize=4)
+axes[1].bar_label(bars, fmt='%.1f', padding=3)
+axes[1].set(title="Mean delivery time by day of week", xlabel="Day of week", ylabel="Mean delivery time (min)",
+            ylim=(by_day["mean"].min() - 3, by_day["mean"].max() + 3))
+axes[1].tick_params(axis="x", rotation=30)
+plt.tight_layout(); plt.show()
+
+print(f"Slowest hour: {by_hour['mean'].idxmax()}:00 ({by_hour['mean'].max():.1f} min) | "f"fastest hour: {by_hour['mean'].idxmin()}:00 ({by_hour['mean'].min():.1f} min)")
+print(f"Slowest day: {by_day['mean'].idxmax()} ({by_day['mean'].max():.1f} min) | "f"fastest day: {by_day['mean'].idxmin()} ({by_day['mean'].min():.1f} min)")
