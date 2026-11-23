@@ -442,3 +442,19 @@ print(f"Outstanding orders: lowest decile {g_out['mean'].iloc[0]:.1f} min -> hig
       f"(change {g_out['mean'].iloc[-1]-g_out['mean'].iloc[0]:+.1f})")
 print(f"Busy partners:      lowest decile {g_busy['mean'].iloc[0]:.1f} min -> highest decile {g_busy['mean'].iloc[-1]:.1f} min "
       f"(change {g_busy['mean'].iloc[-1]-g_busy['mean'].iloc[0]:+.1f})")
+
+cat_stats = eda.groupby("store_primary_category")[TARGET].agg(["mean", "std", "count"])
+cat_stats = cat_stats[cat_stats["count"] >= 500].sort_values("mean")
+print(f"{len(cat_stats)} categories have >= 500 orders")
+
+show = pd.concat([cat_stats.head(8), cat_stats.tail(8)]).drop_duplicates()
+plt.figure(figsize=(15, 4.5))
+colors = ["seagreen" if v < eda[TARGET].mean() else "indianred" for v in show["mean"]]
+bars = plt.bar(show.index.astype(str), show["mean"], color=colors)
+plt.bar_label(bars, fmt='%.1f', padding=3)
+plt.axhline(eda[TARGET].mean(), color="black", ls="--", label=f"Overall mean = {eda[TARGET].mean():.1f}")
+plt.ylim(show["mean"].min() - 2, show["mean"].max() + 2)
+plt.title("Fastest and slowest restaurant categories (mean delivery time)")
+plt.xlabel("Store primary category (code)"); plt.ylabel("Mean delivery time (min)"); plt.legend()
+plt.tight_layout(); plt.show()
+print(f"Spread between fastest and slowest category means: {cat_stats['mean'].max() - cat_stats['mean'].min():.1f} minutes")
