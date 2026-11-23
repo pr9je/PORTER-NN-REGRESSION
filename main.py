@@ -328,3 +328,51 @@ print("Markets: top market holds", f"{eda['market_id'].value_counts(normalize=Tr
 print("Order protocols: top protocol holds", f"{eda['order_protocol'].value_counts(normalize=True).iloc[0]*100:.1f}% of orders")
 print(f"Store categories: {eda['store_primary_category'].nunique()} in total; top 15 cover "
       f"{eda['store_primary_category'].isin(top_cats).mean()*100:.1f}% of orders")
+
+# Bivariate Analysis : delivery time by category (box plots)
+fig, axes = plt.subplots(2, 2, figsize=(15, 6.2))
+sns.boxplot(data=eda, x="market_id", y=TARGET, color="steelblue", fliersize=1, ax=axes[0, 0])
+axes[0, 0].set(title="Delivery time by market", xlabel="Market ID", ylabel="Delivery time (min)")
+sns.boxplot(data=eda, x="order_protocol", y=TARGET, color="seagreen", fliersize=1, ax=axes[0, 1])
+axes[0, 1].set(title="Delivery time by order protocol", xlabel="Order protocol (code)", ylabel="Delivery time (min)")
+sns.boxplot(data=eda, x="day_of_week", y=TARGET, order=day_order, color="darkorange", fliersize=1, ax=axes[1, 0])
+axes[1, 0].set(title="Delivery time by day of week", xlabel="Day of week", ylabel="Delivery time (min)")
+axes[1, 0].tick_params(axis="x", rotation=30)
+sns.boxplot(data=eda, x="partners_overloaded", y=TARGET, color="indianred", fliersize=1, ax=axes[1, 1])
+axes[1, 1].set(title="Delivery time: partners overloaded (busy > on-shift)?", xlabel="0 = no, 1 = yes", ylabel="Delivery time (min)")
+plt.tight_layout(); plt.show()
+
+lines = []
+for col in ["market_id", "order_protocol", "day_of_week", "partners_overloaded"]:
+    med = eda.groupby(col)[TARGET].median()
+    lines.append(f"* **{col}**: highest median delivery time at `{med.idxmax()}` ({med.max():.1f} min), lowest at `{med.idxmin()}` "
+                 f"({med.min():.1f} min); spread between medians {med.max() - med.min():.1f} min.")
+display(Markdown("\n".join(lines)))
+
+# Correlation Heatmap
+corr_cols = [c for c in NUMERIC_FEATURES if c not in ("hour_sin", "hour_cos")] + [TARGET]
+corr = eda[corr_cols].corr()
+plt.figure(figsize=(10, 7))
+sns.heatmap(corr, annot=True, annot_kws={"size": 7}, fmt=".2f", cmap="coolwarm", center=0, linewidths=0.4, cbar_kws={"label": "Pearson correlation"})
+plt.title("Correlation heatmap (training set)")
+plt.tight_layout(); plt.show()
+
+target_corr = corr[TARGET].drop(TARGET).sort_values(key=np.abs, ascending=False)
+print("Features ranked by |correlation| with delivery time:")
+display(target_corr.round(3).to_frame("correlation"))
+pairs = corr.drop(index=TARGET, columns=TARGET).where(np.triu(np.ones((len(corr)-1, len(corr)-1)), 1).astype(bool)).stack()
+print("Most correlated feature pairs (possible redundancy):")
+display(pairs.reindex(pairs.abs().sort_values(ascending=False).index).head(5).round(3).to_frame("correlation"))
+
+# Scatterplots: numeric features vs delivery time
+sample = eda.sample(5000, random_state=SEED)
+fig, axes = plt.subplots(3, 3, figsize=(16, 8.5))
+for ax, col in zip(axes.ravel(), BASE_NUMERIC):
+    sns.regplot(data=sample, x=col, y=TARGET, scatter_kws={"alpha": 0.15, "s": 8},
+                line_kws={"color": "red"}, ax=ax)
+    ax.set(title=f"Delivery time vs {col}", xlabel=col, ylabel="Delivery time (min)")
+for ax in axes.ravel()[len(BASE_NUMERIC):]:
+    ax.axis("off")
+plt.tight_layout(); plt.show()
+
+
