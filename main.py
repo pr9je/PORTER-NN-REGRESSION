@@ -202,3 +202,45 @@ for frame in (X_train, X_test):
 NUMERIC_FEATURES.append("is_peak_hour"); FEATURES.append("is_peak_hour")
 print("Peak hours (5 busiest in training data, hours as stored):", PEAK_HOURS)
 print(f"{len(NUMERIC_FEATURES)} numeric + {len(CATEGORICAL_FEATURES)} categorical features in total")
+
+# Preprocessing pipeline: imputation outlier capping, scaling encoding
+class IQRCapper(BaseEstimator, TransformerMixin):
+    """Winsorise each column to [Q1 - k*IQR, Q3 + k*IQR].
+    The fences are learned in fit() (training data only) and re-used in transform()."""
+    def __init__(self, factor=3.0):
+        self.factor = factor
+
+    def fit(self, X, y=None):
+        X = np.asarray(X, dtype=float)
+        q1, q3 = np.nanpercentile(X, [25, 75], axis=0)
+        iqr = q3 - q1
+        self.lower_ = np.where(iqr > 0, q1 - self.factor * iqr, -np.inf)   # IQR = 0 -> do not cap
+        self.upper_ = np.where(iqr > 0, q3 + self.factor * iqr, np.inf)
+        return self
+
+    def transform(self, X):
+        return np.clip(np.asarray(X, dtype=float), self.lower_, self.upper_)
+
+    def get_feature_names_out(self, input_features=None):
+        return np.asarray(input_features, dtype=object)
+
+
+def make_preprocessor(scale=False, cap_factor=None):
+    """Build a fresh (unfitted) preprocessing pipeline."""
+    num_steps = [("impute", SimpleImputer(strategy="median"))]
+    if cap_factor is not None:
+        num_steps.append(("cap", IQRCapper(factor=cap_factor)))
+    if scale:
+        num_steps.append(("scale", StandardScaler()))
+    cat_steps = [("impute", SimpleImputer(strategy="most_frequent")),
+                 ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]
+    return ColumnTransformer([("num", Pipeline(num_steps), NUMERIC_FEATURES),
+                              ("cat", Pipeline(cat_steps), CATEGORICAL_FEATURES)])
+
+# Quick sanity test: fit on TRAIN only, transform both, confirm no NaN remains
+demo_prep = make_preprocessor(scale=True, cap_factor=3.0)
+demo_train = demo_prep.fit_transform(X_train)
+demo_test = demo_prep.transform(X_test)
+print("Transformed train:", demo_train.shape, "| test:", demo_test.shape)
+print("NaN left in train/test:", int(np.isnan(demo_train).sum()), "/", int(np.isnan(demo_test).sum()))
+
