@@ -244,3 +244,27 @@ demo_test = demo_prep.transform(X_test)
 print("Transformed train:", demo_train.shape, "| test:", demo_test.shape)
 print("NaN left in train/test:", int(np.isnan(demo_train).sum()), "/", int(np.isnan(demo_test).sum()))
 
+# Exo=ploratory Data Analysis and Outliner Treatment
+eda = X_train.copy()
+eda[TARGET] = y_train
+BASE_NUMERIC = [c for c in ["total_items", "subtotal", "num_distinct_items", "min_item_price", "max_item_price",
+                            "total_onshift_partners", "total_busy_partners", "total_outstanding_orders",
+                            "estimated_store_to_consumer_driving_duration"] if c in eda.columns]
+print("EDA rows (training set):", f"{len(eda):,}")
+
+# Target Distribution and boxplot
+fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
+sns.histplot(eda[TARGET], bins=60, kde=True, color="steelblue", ax=axes[0])
+axes[0].axvline(eda[TARGET].mean(), color="red", ls="--", label=f"Mean = {eda[TARGET].mean():.1f}")
+axes[0].axvline(eda[TARGET].median(), color="green", ls="--", label=f"Median = {eda[TARGET].median():.1f}")
+axes[0].set(title="Distribution of delivery time", xlabel="Delivery time (minutes)", ylabel="Number of orders")
+axes[0].legend()
+sns.boxplot(x=eda[TARGET], color="lightsteelblue", ax=axes[1])
+axes[1].set(title="Boxplot of delivery time", xlabel="Delivery time (minutes)")
+plt.tight_layout(); plt.show()
+
+lo, hi = eda[TARGET].quantile(0.25) - 1.5 * (eda[TARGET].quantile(0.75) - eda[TARGET].quantile(0.25)), \
+         eda[TARGET].quantile(0.75) + 1.5 * (eda[TARGET].quantile(0.75) - eda[TARGET].quantile(0.25))
+print(f"Mean {eda[TARGET].mean():.1f} min | median {eda[TARGET].median():.1f} | std {eda[TARGET].std():.1f} | "
+      f"min {eda[TARGET].min():.0f} | max {eda[TARGET].max():.0f} | skewness {eda[TARGET].skew():.2f}")
+print(f"{(eda[TARGET] > hi).mean()*100:.2f}% of orders are above the 1.5xIQR upper fence ({hi:.1f} min).")
