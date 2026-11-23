@@ -268,3 +268,27 @@ lo, hi = eda[TARGET].quantile(0.25) - 1.5 * (eda[TARGET].quantile(0.75) - eda[TA
 print(f"Mean {eda[TARGET].mean():.1f} min | median {eda[TARGET].median():.1f} | std {eda[TARGET].std():.1f} | "
       f"min {eda[TARGET].min():.0f} | max {eda[TARGET].max():.0f} | skewness {eda[TARGET].skew():.2f}")
 print(f"{(eda[TARGET] > hi).mean()*100:.2f}% of orders are above the 1.5xIQR upper fence ({hi:.1f} min).")
+
+# Univariate Analysis: distribution of every continoues variables
+UNI_COLS = [c for c in BASE_NUMERIC + ["busy_ratio", "outstanding_per_partner", TARGET] if c in eda.columns]
+ncols = 3; nrows = int(np.ceil(len(UNI_COLS) / ncols))
+fig, axes = plt.subplots(nrows, ncols, figsize=(15, 2.3 * nrows))
+for ax, col in zip(axes.ravel(), UNI_COLS):
+    sns.histplot(eda[col].dropna(), bins=40, color="steelblue", ax=ax)
+    ax.set(title=f"{col} (skew {eda[col].skew():.2f})", xlabel=col, ylabel="Orders")
+for ax in axes.ravel()[len(UNI_COLS):]:
+    ax.axis("off")
+plt.tight_layout(); plt.show()
+
+def describe_skew(s):
+    if abs(s) < 0.5:
+        return "roughly symmetric"
+    side = "right-skewed (long tail of large values)" if s > 0 else "left-skewed (long tail of small values)"
+    return side + (", strongly" if abs(s) > 1 else ", moderately")
+
+lines = []
+for col in UNI_COLS:
+    s = eda[col].dropna(); med = s.median()
+    ratio = f", max = {s.max() / med:.1f}x the median" if med > 0 else ""
+    lines.append(f"* **{col}**: skewness {s.skew():.2f}, {describe_skew(s.skew())}; median {med:.1f}, mean {s.mean():.1f}{ratio}.")
+display(Markdown("\n".join(lines)))
