@@ -402,3 +402,43 @@ plt.tight_layout(); plt.show()
 
 print(f"Slowest hour: {by_hour['mean'].idxmax()}:00 ({by_hour['mean'].max():.1f} min) | "f"fastest hour: {by_hour['mean'].idxmin()}:00 ({by_hour['mean'].min():.1f} min)")
 print(f"Slowest day: {by_day['mean'].idxmax()} ({by_day['mean'].max():.1f} min) | "f"fastest day: {by_day['mean'].idxmin()} ({by_day['mean'].min():.1f} min)")
+
+def decile_plot(frame, col, ax, color, series_source=None):
+    # If the column is missing in 'frame' but present in the main 'df', we can pull it using the matching index
+    if col not in frame.columns and series_source is not None and col in series_source.columns:
+        col_data = series_source.loc[frame.index, col]
+    else:
+        col_data = frame[col]
+
+    bins = pd.qcut(col_data, q=10, duplicates="drop")
+    g = frame.groupby(bins, observed=True)[TARGET].agg(["mean", "std", "count"])
+    g["ci"] = 1.96 * g["std"] / np.sqrt(g["count"])
+    
+    # Plot line chart
+    ax.errorbar(range(len(g)), g["mean"], yerr=g["ci"], marker="o", color=color, capsize=3)
+    
+    # Add data labels for each point
+    for idx, row in enumerate(g.itertuples()):
+        ax.annotate(f"{row.mean:.1f}", 
+                    (idx, row.mean), 
+                    textcoords="offset points", 
+                    xytext=(0,10), 
+                    ha='center', 
+                    fontsize=8, 
+                    fontweight='bold', 
+                    color=color)
+        
+    ax.set_xticks(range(len(g)))
+    ax.set_xticklabels([f"{iv.left:.0f}-{iv.right:.0f}" for iv in g.index], rotation=45)
+    ax.set(title=f"Mean delivery time by {col} (deciles)", xlabel=f"{col} (range per decile)", ylabel="Mean delivery time (min)")
+    return g
+
+fig, axes = plt.subplots(1, 2, figsize=(16, 4.2))
+g_out = decile_plot(eda, "total_outstanding_orders", axes[0], "crimson", series_source=df)
+g_busy = decile_plot(eda, "total_busy_dashers", axes[1], "teal", series_source=df)
+plt.tight_layout(); plt.show()
+
+print(f"Outstanding orders: lowest decile {g_out['mean'].iloc[0]:.1f} min -> highest decile {g_out['mean'].iloc[-1]:.1f} min "
+      f"(change {g_out['mean'].iloc[-1]-g_out['mean'].iloc[0]:+.1f})")
+print(f"Busy partners:      lowest decile {g_busy['mean'].iloc[0]:.1f} min -> highest decile {g_busy['mean'].iloc[-1]:.1f} min "
+      f"(change {g_busy['mean'].iloc[-1]-g_busy['mean'].iloc[0]:+.1f})")
