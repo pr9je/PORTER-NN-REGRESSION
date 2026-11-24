@@ -458,3 +458,23 @@ plt.title("Fastest and slowest restaurant categories (mean delivery time)")
 plt.xlabel("Store primary category (code)"); plt.ylabel("Mean delivery time (min)"); plt.legend()
 plt.tight_layout(); plt.show()
 print(f"Spread between fastest and slowest category means: {cat_stats['mean'].max() - cat_stats['mean'].min():.1f} minutes")
+
+# Outlier analysis with the IQR method
+def iqr_bounds(series, k=1.5):
+    q1, q3 = series.quantile([0.25, 0.75])
+    iqr = q3 - q1
+    return q1 - k * iqr, q3 + k * iqr
+
+def outlier_mask(series, k=1.5):
+    lo, hi = iqr_bounds(series, k)
+    return (series < lo) | (series > hi)          # NaN compares False -> never flagged
+
+rows = []
+for col in BASE_NUMERIC + [TARGET]:
+    s = eda[col].dropna()
+    q1, q3 = s.quantile([0.25, 0.75]); lo, hi = iqr_bounds(s, 1.5)
+    rows.append({"column": col, "Q1": q1, "Q3": q3, "IQR": q3 - q1, "lower_fence": lo, "upper_fence": hi,
+                 "max": s.max(), "outliers_1.5xIQR_%": outlier_mask(s, 1.5).mean() * 100,
+                 "outliers_3xIQR_%": outlier_mask(s, 3).mean() * 100})
+outlier_table = pd.DataFrame(rows).set_index("column").round(2)
+display(outlier_table)
