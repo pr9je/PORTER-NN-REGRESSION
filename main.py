@@ -478,3 +478,42 @@ for col in BASE_NUMERIC + [TARGET]:
                  "outliers_3xIQR_%": outlier_mask(s, 3).mean() * 100})
 outlier_table = pd.DataFrame(rows).set_index("column").round(2)
 display(outlier_table)
+
+def before_after_boxplots(before, after, cols, title):
+    """Horizontal boxplots per column. If `after` is None only the 'before' box is drawn."""
+    n = len(cols); ncols = 3; nrows = int(np.ceil(n / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(16, 2.4 * nrows))
+    axes = np.atleast_1d(axes)
+    for ax, col in zip(axes.ravel(), cols):
+        groups = [before[col].dropna()] + ([after[col].dropna()] if after is not None else [])
+        ax.boxplot(groups, vert=False, widths=0.6, flierprops=dict(marker=".", markersize=2, alpha=0.3))
+        ax.set_yticks(range(1, len(groups) + 1))
+        ax.set_yticklabels(["Before", "After"][:len(groups)] if after is not None else ["Before"])
+        ax.set(title=col, xlabel="Value")
+    for ax in axes.ravel()[n:]:
+        ax.axis("off")
+    fig.suptitle(title, fontsize=14, y=1.01)
+    plt.tight_layout(); plt.show()
+
+OUT_COLS = BASE_NUMERIC
+
+CAP_FACTOR = 3.0
+
+# Treatment decision
+# (a) Extreme-target removal: TRAINING rows only
+t_lo, t_hi = iqr_bounds(y_train, CAP_FACTOR)
+keep = y_train.between(t_lo, t_hi)
+X_train_clean, y_train_clean = X_train[keep], y_train[keep]
+print(f"Target fences (3xIQR): {t_lo:.1f} to {t_hi:.1f} minutes")
+print(f"Training rows removed: {(~keep).sum():,} of {len(keep):,} ({(~keep).mean()*100:.2f}%)")
+print(f"Test set untouched: {len(X_test):,} rows")
+
+# (b) Feature capping fences (same maths the pipeline will use), for plotting only
+plot_capper = IQRCapper(CAP_FACTOR).fit(eda[OUT_COLS].to_numpy(dtype=float))
+eda_after = eda.copy()
+eda_after[OUT_COLS] = plot_capper.transform(eda[OUT_COLS].to_numpy(dtype=float))
+eda_after = eda_after[keep]
+capped_share = pd.Series({c: ((eda[c] < lo_) | (eda[c] > hi_)).mean() * 100
+                          for c, lo_, hi_ in zip(OUT_COLS, plot_capper.lower_, plot_capper.upper_)})
+print("\nShare of values capped per column (%):")
+display(capped_share.round(2).to_frame("capped_%").T)
