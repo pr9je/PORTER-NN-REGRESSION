@@ -536,3 +536,35 @@ skew_cols = ["total_items", "subtotal", "max_item_price"]
 print("Skewness before -> after treatment:")
 for c in [c for c in skew_cols if c in eda.columns]:
     print(f"  {c:20s} {eda[c].skew():6.2f} -> {eda_after[c].skew():6.2f}")
+
+# Validation slice from TRAIN only
+X_fit, X_val, y_fit, y_val = train_test_split(X_train, y_train, test_size=0.20, random_state=SEED)
+
+def regression_report(y_true, y_pred):
+    y_true, y_pred = np.asarray(y_true, dtype=float), np.asarray(y_pred, dtype=float).ravel()
+    mse = mean_squared_error(y_true, y_pred)
+    return {"MAE": mean_absolute_error(y_true, y_pred), "MSE": mse, "RMSE": float(np.sqrt(mse)),
+            "R2": r2_score(y_true, y_pred), "Within_5min_%": float(np.mean(np.abs(y_true - y_pred) <= 5) * 100)}
+
+def try_strategy(label, keep_mask, cap_factor):
+    prep = make_preprocessor(scale=False, cap_factor=cap_factor)
+    Xf, yf = X_fit[keep_mask], y_fit[keep_mask]
+    A = prep.fit_transform(Xf)
+    model = HistGradientBoostingRegressor(max_iter=200, learning_rate=0.1, random_state=SEED).fit(A, yf)
+    rep = regression_report(y_val, model.predict(prep.transform(X_val)))
+    return {"strategy": label, "train_rows": int(keep_mask.sum()), **rep}
+
+all_rows = pd.Series(True, index=X_fit.index)
+lo3, hi3 = iqr_bounds(y_fit, 3)
+keep_B = y_fit.between(lo3, hi3)
+keep_C = pd.Series(True, index=X_fit.index)
+for col in BASE_NUMERIC:
+    keep_C &= ~outlier_mask(X_fit[col], 1.5)
+keep_C &= ~outlier_mask(y_fit, 1.5)
+
+impact = pd.DataFrame([
+    try_strategy("A: no treatment", all_rows, None),
+    try_strategy("B: cap 3xIQR + drop extreme targets (chosen)", keep_B, CAP_FACTOR),
+    try_strategy("C: aggressive 1.5xIQR row deletion", keep_C, None),
+]).set_index("strategy")
+display(impact.round(3))
