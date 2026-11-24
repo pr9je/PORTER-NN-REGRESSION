@@ -568,3 +568,11 @@ impact = pd.DataFrame([
     try_strategy("C: aggressive 1.5xIQR row deletion", keep_C, None),
 ]).set_index("strategy")
 display(impact.round(3))
+
+def print_metrics(name, rep):
+    print(f"{name:28s} MAE {rep['MAE']:.3f} | MSE {rep['MSE']:.3f} | RMSE {rep['RMSE']:.3f} | "
+          f"R2 {rep['R2']:.4f} | within 5 min {rep['Within_5min_%']:.1f}%")
+
+dummy = DummyRegressor(strategy="mean").fit(X_train_clean, y_train_clean)
+baseline_report = regression_report(y_test, dummy.predict(X_test))
+print_metrics("Predict-the-mean baseline", baseline_report)
