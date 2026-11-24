@@ -520,3 +520,19 @@ display(capped_share.round(2).to_frame("capped_%").T)
 
 # Before vs After Plots:
 before_after_boxplots(eda, eda_after, OUT_COLS, "Boxplots of numeric features: BEFORE vs AFTER treatment")
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
+sns.histplot(eda[TARGET], bins=60, color="grey", alpha=0.5, label="Before", ax=axes[0])
+sns.histplot(eda_after[TARGET], bins=60, color="steelblue", alpha=0.6, label="After", ax=axes[0])
+axes[0].set(title="Delivery time distribution", xlabel="Delivery time (min)", ylabel="Orders"); axes[0].legend()
+
+comp = pd.DataFrame({"Before": eda[TARGET].describe(), "After": eda_after[TARGET].describe()}).round(2)
+axes[1].axis("off")
+tbl = axes[1].table(cellText=comp.values, rowLabels=comp.index, colLabels=comp.columns, loc="center")
+tbl.scale(1, 1.5); axes[1].set_title("Target summary statistics")
+plt.tight_layout(); plt.show()
+
+skew_cols = ["total_items", "subtotal", "max_item_price"]
+print("Skewness before -> after treatment:")
+for c in [c for c in skew_cols if c in eda.columns]:
+    print(f"  {c:20s} {eda[c].skew():6.2f} -> {eda_after[c].skew():6.2f}")
