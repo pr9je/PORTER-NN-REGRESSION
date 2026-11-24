@@ -517,3 +517,6 @@ capped_share = pd.Series({c: ((eda[c] < lo_) | (eda[c] > hi_)).mean() * 100
                           for c, lo_, hi_ in zip(OUT_COLS, plot_capper.lower_, plot_capper.upper_)})
 print("\nShare of values capped per column (%):")
 display(capped_share.round(2).to_frame("capped_%").T)
+
+# Before vs After Plots:
+before_after_boxplots(eda, eda_after, OUT_COLS, "Boxplots of numeric features: BEFORE vs AFTER treatment")
