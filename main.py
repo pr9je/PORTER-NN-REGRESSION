@@ -576,3 +576,63 @@ def print_metrics(name, rep):
 dummy = DummyRegressor(strategy="mean").fit(X_train_clean, y_train_clean)
 baseline_report = regression_report(y_test, dummy.predict(X_test))
 print_metrics("Predict-the-mean baseline", baseline_report)
+
+# Train the random forest 
+rf_pipeline = Pipeline([
+    ("prep", make_preprocessor(scale=False, cap_factor=CAP_FACTOR)),
+    ("model", RandomForestRegressor(n_estimators=100, min_samples_leaf=10, max_features=0.33,
+                                    n_jobs=-1, random_state=SEED)),
+])
+
+t0 = time.time()
+rf_pipeline.fit(X_train_clean, y_train_clean)           # preprocessing fitted on training data only
+rf_fit_time = time.time() - t0
+
+t0 = time.time()
+rf_pred = rf_pipeline.predict(X_test)
+rf_predict_time = time.time() - t0
+rf_train_pred = rf_pipeline.predict(X_train_clean)
+
+rf_report = regression_report(y_test, rf_pred)
+rf_train_report = regression_report(y_train_clean, rf_train_pred)
+print(f"Training time: {rf_fit_time:.1f}s | prediction time for {len(X_test):,} test rows: {rf_predict_time:.2f}s\n")
+print_metrics("Random Forest (test)", rf_report)
+print_metrics("Random Forest (train)", rf_train_report)
+
+# Actual vs Predicted, rediduals and feature importance 
+def plot_actual_vs_pred(y_true, y_pred, name, color):
+    y_true = np.asarray(y_true); y_pred = np.asarray(y_pred).ravel()
+    idx = np.random.RandomState(SEED).choice(len(y_true), size=min(5000, len(y_true)), replace=False)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+    axes[0].scatter(y_true[idx], y_pred[idx], alpha=0.25, s=10, color=color)
+    lims = [min(y_true.min(), y_pred.min()), max(y_true.max(), y_pred.max())]
+    axes[0].plot(lims, lims, "r--", label="Perfect prediction")
+    axes[0].set(title=f"{name}: actual vs predicted (5,000 test orders)", xlabel="Actual delivery time (min)",
+                ylabel="Predicted delivery time (min)"); axes[0].legend()
+    resid = y_true - y_pred
+    sns.histplot(resid, bins=60, kde=True, color=color, ax=axes[1])
+    axes[1].axvline(0, color="red", ls="--")
+    axes[1].set(title=f"{name}: residuals (actual - predicted)", xlabel="Error (min)", ylabel="Number of orders")
+    plt.tight_layout(); plt.show()
+
+plot_actual_vs_pred(y_test, rf_pred, "Random Forest", "steelblue")
+
+def grouped_importance(prep, importances):
+    """Sum one-hot columns back into their original feature (e.g. all store_primary_category_* columns)."""
+    names = prep.get_feature_names_out()
+    totals = {}
+    for name, imp in zip(names, importances):
+        base = name.split("__", 1)[1]
+        for cat in CATEGORICAL_FEATURES:
+            if base.startswith(cat + "_"):
+                base = cat; break
+        totals[base] = totals.get(base, 0) + imp
+    return pd.Series(totals).sort_values(ascending=False)
+
+rf_importance = grouped_importance(rf_pipeline.named_steps["prep"], rf_pipeline.named_steps["model"].feature_importances_)
+top = rf_importance.head(15).iloc[::-1]
+plt.figure(figsize=(9, 4.2))
+plt.barh(top.index, top.values, color="steelblue")
+plt.title("Random Forest feature importance (one-hot columns grouped by original feature)")
+plt.xlabel("Importance (share of total impurity reduction)"); plt.ylabel("Feature")
+plt.tight_layout(); plt.show()
